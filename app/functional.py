@@ -76,40 +76,50 @@ def get_multi_post(json_data: dict) -> tuple:
 	images = []
 	videos = []
 	
-	for edge in json_data['edge_sidecar_to_children']['edges']:
-		is_video = edge['node']['is_video']
+	for edge in json_data['carousel_media']:
+		is_video = "video_versions" in edge.keys()
 		if not is_video:
-			images.append(edge['node']['display_url'])
+			images.append(get_best(edge['image_versions2']['candidates'])['url'])
 		else:
-			videos.append(edge['node']["video_url"])
+			videos.append(get_best(edge['video_versions'])["url"])
 	
 	return (images, videos)
+
+def get_best(data):
+	Max = None
+	for el in data:
+		if not Max:
+			Max = el
+		else:
+			if Max['width'] < el['width']:
+				Max = el
+	
+	return Max
 
 @logger.catch
 def get_single_post(json_data: dict) -> tuple:
 	images = []
 	videos = []
-	
-	edge = json_data
-	is_video = edge['is_video']
+
+	is_video = "video_versions" in json_data.keys()
 	if not is_video:
-		images.append(edge['display_url'])
+		images.append(get_best(json_data['image_versions2']['candidates'])['url'])
 	else:
-		videos.append(edge["video_url"])
+		videos.append(get_best(json_data['video_versions'])['url'])
 	
 	return (images, videos)
 
 @logger.catch
 def get_post_json(link: str) -> dict:
 	response = requests.get(url=link, headers=headers, params=params, cookies=CookieJar)
-	post_json = response.json()["graphql"]["shortcode_media"]
+	post_json = response.json()['items'][0]
 
 	return post_json
 
 @logger.catch
 def get_post(link: str) -> list:	
 	post_json = get_post_json(link)
-	is_single = not "edge_sidecar_to_children" in post_json.keys()
+	is_single = 'carousel_media_count' not in post_json.keys()
 	if is_single:
 		images, videos = get_single_post(post_json)
 	else:
